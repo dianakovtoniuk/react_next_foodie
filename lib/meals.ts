@@ -1,4 +1,4 @@
-import { S3 } from '@aws-sdk/client-s3';
+import fs from 'node:fs';
 
 import sql from 'better-sqlite3';
 import slugify from 'slugify';
@@ -6,13 +6,6 @@ import xss from 'xss';
 
 import type { Meal } from '@/types/meal';
 
-const s3 = new S3({
-  region: 'us-east-1',
-  // credentials: {
-  //   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  //   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  // },
-});
 const db = sql('meals.db');
 
 export type NewMeal = {
@@ -44,13 +37,13 @@ export async function saveMeal(meal: NewMeal) {
   const extension = meal.image.name.split('.').pop();
   const fileName = `${slug}.${extension}`;
 
+  const stream = fs.createWriteStream(`public/images/${fileName}`);
   const bufferedImage = await meal.image.arrayBuffer();
 
-  s3.putObject({
-    Bucket: 'maxschwarzmueller-nextjs-demo-users-image',
-    Key: fileName,
-    Body: Buffer.from(bufferedImage),
-    ContentType: meal.image.type,
+  stream.write(Buffer.from(bufferedImage), (error) => {
+    if (error) {
+      throw new Error('Saving image failed!');
+    }
   });
 
   db.prepare(
@@ -71,6 +64,6 @@ export async function saveMeal(meal: NewMeal) {
     ...meal,
     slug,
     instructions,
-    image: fileName,
+    image: `/images/${fileName}`,
   });
 }
